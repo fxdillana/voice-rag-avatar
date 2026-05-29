@@ -1,67 +1,129 @@
-# Félix Alberto Dillana González
+# Voice RAG Avatar
 
-**AI Engineer · LLM Systems · RAG · MLOps**
+Asistente conversacional con avatar en tiempo real para el sector farmacéutico. Pipeline de voz RAG que responde exclusivamente a partir de documentación clínica propietaria — sin alucinaciones, sin conocimiento general.
 
-I build end-to-end AI systems — from data pipelines and vector databases to conversational agents and live avatar interfaces. Currently working as an AI Consultant at NunkyWorld, developing production-grade generative AI solutions for enterprise clients.
+## Demo
 
-Background in intelligence analysis (OSINT, HUMINT, strategic forecasting) applied to AI-driven information systems.
+![Voice RAG Avatar conectado y funcionando](docs/demo.png)
 
----
+## Arquitectura
 
-## Projects
+```
+Voz del usuario
+  → ElevenLabs Conversational Agent  (STT + LLM + TTS)
+  → Tool call: retrieve_context       (recuperación RAG)
+  → FastAPI backend                   (capa de recuperación)
+  → Qdrant                            (documentación clínica indexada)
+  → ElevenLabs Agent                  (generación de respuesta)
+  → HeyGen LiveAvatar                 (avatar visual en tiempo real)
+  → Navegador (LiveKit)               (vídeo + audio WebRTC)
+```
 
-###  Medical RAG Avatar
-> Conversational AI assistant with a live avatar for the pharmaceutical sector. Voice-first RAG pipeline grounded exclusively in proprietary clinical documentation.
+La capa RAG está completamente desacoplada de la capa de avatar: Qdrant gestiona siempre la recuperación de conocimiento, ElevenLabs gestiona la voz y el razonamiento, y HeyGen se usa exclusivamente como superficie de salida visual.
 
-**Stack:** Qdrant · LangChain · ElevenLabs Conversational AI · HeyGen LiveAvatar · FastAPI · BAAI/bge-m3 · AWS  
-**Highlights:** MMR retrieval over clinical docs · native ElevenLabs↔HeyGen integration · real-time WebRTC via LiveKit · zero hallucination design  
-→ [`medical-rag-avatar`](https://github.com/fxdillana/medical-rag-avatar)
+## Características
 
----
-
-###  ML Classification & Regression
-> End-to-end supervised learning pipelines on real datasets — exploratory analysis, feature engineering, model selection and evaluation.
-
-**Stack:** Scikit-learn · Pandas · NumPy · Matplotlib · MLflow  
-**Models:** Random Forest · Gradient Boosting · Logistic Regression · feature selection with ANOVA/SelectKBest  
-→ [`ml-classification-regression`](https://github.com/fxdillana/ml-classification-regression)
-
----
+- **Respuestas fundamentadas** — el LLM solo responde a partir de los chunks recuperados; si la respuesta no está en la base de conocimiento, lo indica
+- **Voice-first** — conversación completa de voz a voz con latencia percibida mínima
+- **Avatar en tiempo real** — avatar con sincronización labial en tiempo real via HeyGen LiveAvatar + LiveKit WebRTC
+- **Recuperación MMR** — Maximal Marginal Relevance para reducir redundancia entre chunks
+- **Multilingüe** — embeddings con `BAAI/bge-m3` (alto rendimiento multilingüe)
+- **Gestión de credenciales** — todos los secretos via `.env`, nunca hardcodeados
 
 ## Stack
 
+| Capa | Tecnología |
+|---|---|
+| Embeddings | `BAAI/bge-m3` via HuggingFace |
+| Vector store | Qdrant Cloud |
+| Agente conversacional | ElevenLabs Conversational AI |
+| Avatar | HeyGen LiveAvatar LITE |
+| Transporte en tiempo real | LiveKit (WebRTC) |
+| Backend de recuperación | FastAPI + uvicorn |
+| Ingesta de documentos | PyMuPDF, LangChain text splitters |
+
+## Estructura del proyecto
+
 ```
-LLMs & Agents      LangChain · LangGraph · ElevenLabs · Pydantic AI · Prompt Engineering
-Vector & Retrieval  Qdrant · FAISS · BAAI/bge-m3 · sentence-transformers · RAG · MMR
-ML & Deep Learning  Scikit-learn · PyTorch · TensorFlow · HuggingFace · LoRA/QLoRA · MLflow
-Cloud & Infra       AWS (Certified) · Docker · FastAPI · ngrok · Git/GitHub
-Data               Pandas · NumPy · SQL · PyMuPDF · data pipelines
-Intelligence        OSINT · HUMINT · strategic analysis · information structuring
+voice-rag-avatar/
+├── notebooks/
+│   └── voice-rag-avatar.ipynb   # notebook de integración final
+├── ingestion/
+│   └── ingest.py                # script genérico PDF → Qdrant
+├── docs/
+│   ├── architecture.md          # decisiones de arquitectura
+│   └── demo.png                 # captura del sistema en funcionamiento
+├── .env.example                 # variables de entorno necesarias
+├── requirements.txt
+└── README.md
 ```
 
----
+## Setup
 
-## Certifications
+### 1. Clonar e instalar
 
-- AWS Certified AI Practitioner
-- AWS Certified Cloud Practitioner  
-- Generative AI with Large Language Models — DeepLearning.AI
-- Machine Learning in Production — DeepLearning.AI
-- Qdrant Essentials
-- Python Intermediate — DataCamp
+```bash
+git clone https://github.com/TU_USUARIO/voice-rag-avatar.git
+cd voice-rag-avatar
+pip install -r requirements.txt
+```
 
----
+### 2. Configurar variables de entorno
 
-## Education
+```bash
+cp .env.example .env
+# Edita .env con tus propias credenciales
+```
 
-**Master's in Advanced & Generative AI** — MBIT School, Madrid (2024–2025)  
-**Master's in Intelligence Analysis** — Universidad Rey Juan Carlos, Madrid (2021–2023)  
-**BA Sociology** — Universidad Complutense de Madrid (2016–2021)
+Servicios necesarios:
+- [Qdrant Cloud](https://cloud.qdrant.io) — tier gratuito disponible
+- [ElevenLabs](https://elevenlabs.io) — agente conversacional
+- [HeyGen](https://heygen.com) — acceso a LiveAvatar API
 
----
+### 3. Indexar documentos
 
-## Contact
+```bash
+python ingestion/ingest.py --docs-dir ./mis_documentos --collection mi_coleccion
+```
 
- fxdillana@gmail.com  
- 
- [LinkedIn](www.linkedin.com/in/felix-alberto-dillana-gonzalez)
+Divide los PDFs en chunks, genera embeddings con `BAAI/bge-m3` y los sube a Qdrant.
+
+### 4. Configurar el agente de ElevenLabs
+
+En tu agente de ElevenLabs, añade una herramienta personalizada:
+
+- **Nombre:** `retrieve_context`
+- **Método:** `POST`
+- **URL:** `https://TU_URL_NGROK/retrieve-context`
+- **Parámetro body:** `question` (string)
+
+### 5. Ejecutar el notebook
+
+Abre `notebooks/voice-rag-avatar.ipynb` y ejecuta todas las celdas. Se abrirá una ventana del navegador con el avatar listo para conversar.
+
+## Cómo funciona
+
+### Flujo de recuperación
+
+Cuando el usuario hace una pregunta, el agente de ElevenLabs activa la herramienta `retrieve_context`. Esta llama al backend FastAPI, que consulta Qdrant usando búsqueda MMR (k=6, fetch_k=20) para recuperar los chunks más relevantes y diversos. Los chunks se formatean con metadatos de fuente y se devuelven al agente como contexto para la generación.
+
+### Integración del avatar
+
+HeyGen LiveAvatar se conecta al agente de ElevenLabs via `elevenlabs_agent_config` — integración nativa que elimina la necesidad de piping manual de audio. La sesión corre sobre LiveKit WebRTC y se renderiza en un viewer HTML local.
+
+### Base de conocimiento
+
+La base de conocimiento usada en este proyecto contiene documentación clínica confidencial y no está incluida en el repositorio. El script de ingesta (`ingest.py`) es completamente genérico y funciona con cualquier colección de documentos PDF.
+
+## Evolución del proyecto
+
+Este proyecto pasó por 16 iteraciones. Decisiones arquitectónicas clave:
+
+- **v1–v5:** Pydantic AI + Gemini como LLM, pyttsx3 para TTS local
+- **v6–v10:** Backend FastAPI + ngrok para exponer la recuperación a ElevenLabs
+- **v11–v13:** ElevenLabs Conversational Agent reemplaza a Pydantic AI; WebSocket manual + resampleo de audio PCM (16kHz→24kHz) para HeyGen
+- **v14–v16:** Integración nativa `elevenlabs_agent_config` elimina el pipeline de audio manual
+
+## Licencia
+
+MIT
